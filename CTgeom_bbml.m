@@ -98,15 +98,15 @@ end
 
 % Input global greyscale threshold and display a warning for values outside
 % of the specified range
-% threshold = input(' Input threshold value (0-255): ');
-% while threshold>255 || threshold<0
-%     fprintf(2,'\n Please enter a threshold between 0 and 255. \n\n')
-%     threshold = input('Input threshold value (0-255): ');
-% end
+threshold = input(' Input threshold value (0-255): ');
+while threshold>255 || threshold<0
+    fprintf(2,'\n Please enter a threshold between 0 and 255. \n\n')
+    threshold = input('Input threshold value (0-255): ');
+end
 
 % !!! Threshold PREVIOUSLY AN INPUT ^ But changed by RKK to be a constant.
 % Uncomment the code above and comment the code below to return to input.
-threshold = 70;
+% threshold = 70;
 
 % Input whether left or right limbs will be analyzed, correct common
 % mistakes, and display a warning for other values
@@ -590,11 +590,11 @@ try % use a try/catch block to run the code and save anything that has already r
                 % tibia. A femur is tested about the mediolateral axis with
                 % the anterior surface in tension
                 
-                if bone == 't'
-                    section_mod = Iuu/medial_extreme;
-                else
-                    section_mod = Ivv/anterior_extreme;
-                end
+%                 if bone == 't'
+%                     section_mod = Iuu/medial_extreme;
+%                 else
+%                     section_mod = Ivv/anterior_extreme;
+%                 end
                 
                 %********************** SLICE OUTPUT***********************
                 

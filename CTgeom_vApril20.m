@@ -77,23 +77,49 @@ cat_1=key{1,2};
 cat_2=key{1,3};
 
 % Variables in category 1
-cat1_1=key{2,2};
+check1_1=key{2,2};
 for j=2:length(key)
-    if strcmp(cat1_1,key{j,2})
+    if strcmp(check1_1,key{j,2})
     else
-        cat1_2=key{j,2};
+        check1_2=key{j,2};
         break
     end
 end
 
+% 
+answer = questdlg('Which variable would you like placed first?', ...
+	cat_1, ...
+	check1_1,check1_2,'');
+% Handle response
+switch answer
+    case check1_1
+        cat1_1=check1_1;
+        cat1_2=check1_2;
+    case check1_2
+        cat1_1=check1_2;
+        cat1_2=check1_1;
+end
+
 %Variables in category 2
-cat2_1=key{2,3};
+check2_1=key{2,3};
 for j=2:length(key)
-    if strcmp(cat2_1,key{j,3})
+    if strcmp(check2_1,key{j,3})
     else
-        cat2_2=key{j,3};
+        check2_2=key{j,3};
         break
     end
+end
+answer = questdlg('Which variable would you like placed first?', ...
+	cat_2, ...
+	check2_1,check2_2,'');
+% Handle response
+switch answer
+    case check2_1
+        cat2_1=check2_1;
+        cat2_2=check2_2;
+    case check2_2
+        cat2_1=check2_2;
+        cat2_2=check2_1;
 end
 
 A_name=[cat1_1 ' ' cat2_1];

@@ -1,6 +1,9 @@
 function [ ]  = CTgeom_fc()
 %% Revision History
 
+% Edited Jan 6 2021 by Rachel Kohler to change CT_geom outputs: Total Area,
+% Marrow Area, Bone Area, BA/TA, Cortical Thickness, Imax, Imin, TMD
+
 % Edited Feb 4 2020 by Rachel Kohler to add error explanation if folders
 % are setup wrong.
 
@@ -188,7 +191,8 @@ try % use a try/catch block to run the code and save anything that has already r
     A = 360/ang+1;
     prof_out_peri_cell = cell(total_count, A);
     prof_out_endo_cell = cell(total_count, A);
-    geom_out_cell = cell(total_count, 19);
+    geom_out_cell = cell(total_count, 8);
+    mech_out_cell = cell(total_count, 4);
     sample_list = cell(1, total_count);
     ac_step = .11/255;
     offset = 0;
@@ -216,7 +220,7 @@ try % use a try/catch block to run the code and save anything that has already r
             
             tic
             
-            clearvars -except offset res tot total_count ang side bone eq_num eq_denom overall_folder sub_folder overall_listing subfolder_listing threshold  sub_folders folders A prof_out_peri_cell prof_out_endo_cell sample_list geom_out_cell m k ac_step
+            clearvars -except offset res tot total_count ang side bone eq_num eq_denom overall_folder sub_folder overall_listing subfolder_listing threshold  sub_folders folders A prof_out_peri_cell prof_out_endo_cell sample_list geom_out_cell mech_out_cell m k ac_step
             
             % Store the .bmp filenames in the folder
             filename=[sub_folder '\' sub_folders(k,1).name];
@@ -230,7 +234,8 @@ try % use a try/catch block to run the code and save anything that has already r
             peri_out = zeros(length(slices),A);
             endo_out = zeros(length(slices),A);
             profiles = zeros((2*length(slices)+3),A);
-            geom_out = zeros(length(slices)+2,19);
+            geom_out = zeros(length(slices)+2,8);
+            mech_out = zeros(length(slices)+2,4);
             tmd_gs = zeros(length(slices), 3);
             centroid_x = zeros(length(slices), 1);
             centroid_y = zeros(length(slices), 1);
@@ -625,6 +630,7 @@ try % use a try/catch block to run the code and save anything that has already r
                 total_cs_area = total_cs_area * 1e-6;
                 marrow_area = marrow_area * 1e-6;
                 cortical_area = cortical_area * 1e-6;
+                BA_TA=cortical_area/total_cs_area*100;
                 cort_thickness = cort_thickness * 1e-3;
                 AP_width = AP_width * 1e-3;
                 ML_width = ML_width * 1e-3;
@@ -660,10 +666,10 @@ try % use a try/catch block to run the code and save anything that has already r
                 end
                 
                 % Store the output from each slice as a row in geom_out
-                geometry = [total_cs_area marrow_area cortical_area cort_thickness ...
-                    periosteal_BS endocortical_BS Imax ang_max Imin ang_min AP_width ML_width APtoMLratio  Iap ...
-                    Iml section_mod medial_extreme anterior_extreme tmd_HA];
+                geometry = [total_cs_area marrow_area cortical_area BA_TA cort_thickness Imax Imin tmd_HA];
+                mechanics = [Iap medial_extreme Iml anterior_extreme];
                 geom_out(j,:) = geometry;
+                mech_out(j,:) = mechanics;
                 
             end
             
@@ -724,7 +730,7 @@ try % use a try/catch block to run the code and save anything that has already r
             title('Polar Plot of Avg Profile')
             line_r = -max(avg_peri)+50:max(avg_peri)+50;
             ang_max_rad = mean(geom_out(1:length(slices),8)).*pi./180;
-            ang_min_rad = mean(geom_out(1:length(slices),10)).*pi./180;
+            ang_min_rad = mean(geom_out(1:length(slices),8)).*pi./180;
             ang_max_rad = ones(1,length(line_r)).*ang_max_rad;
             ang_min_rad = ones(1,length(line_r)).*ang_min_rad;
             pol_max = polarplot(ang_max_rad, line_r, '-r');
@@ -764,8 +770,13 @@ try % use a try/catch block to run the code and save anything that has already r
             % Create a cell array for geom_avg
             geom_mean = mean(geom_out(1:length(slices),:));
             mean_cell=num2cell(geom_mean);
-            geom_out_cell(offset+k, 1:18) = mean_cell(1: 18);
-            geom_out_cell(offset+k, 19) = num2cell(tmd_HA_avg);
+            geom_out_cell(offset+k, 1:7) = mean_cell(1:7);
+            geom_out_cell(offset+k, 8) = num2cell(tmd_HA_avg);
+            
+            mech_mean = mean(mech_out(1:length(slices),:));
+            mean_mech_cell=num2cell(mech_mean);
+            mech_out_cell(offset+k, 1:4) = mean_mech_cell(1:4);
+
             sample_list{offset+k} = folder;
             
             timer = toc;
@@ -791,6 +802,8 @@ catch ME
             %geom_out_cell(all(cellfun(@isempty,geom_out_cell),2),:) = [];
             partial = length(sample_list);
             geom_out_cell(partial+1:end,:) = [];
+            mech_out_cell(partial+1:end,:) = [];
+            
             prof_out_peri_cell(partial+1:end,:) = [];
             prof_out_endo_cell(partial+1:end,:) = [];
             
@@ -805,11 +818,16 @@ catch ME
             xlswrite([overall_folder '\CTprof_avg_toerror.xlsx'], prof_mean_out, 'Raw Data', 'A1')
             
             geom_out_cell = horzcat(sample_list', geom_out_cell); % label the rows
-            headers = {'Total CSA (mm^2)', 'Marrow Area (mm^2)', 'Cortical Area(mm^2)', 'Cortical Thickness (mm)', 'Periosteal BS (mm)', 'Endocortical BS (mm)',  'Imax (mm^4)', 'Theta max (deg)', 'Imin (mm^4)','Theta min (deg)', 'AP Width (mm)', 'ML Width (mm)', 'AP/ML',  'Iap (mm^4)', 'Iml (mm^4)',   'Section Modulus (mm^3)', 'Medial Extreme (mm)', 'Anterior Extreme (mm)','TMD (g/cm^3 HA)'};
+            headers = {'Total Area (mm^2)', 'Marrow Area (mm^2)', 'Bone Area (mm^2)', 'BA/TA (%)', 'Cortical Thickness (mm)', 'Imax (mm^4)', 'Imin (mm^4)', 'TMD (g/cm^3 HA)'};
             headers = horzcat(' ', headers);
             geom_mean_out = [headers; geom_out_cell]; % add column titles
             xlswrite([overall_folder '\CTgeom_avg_toerror.xlsx'], geom_mean_out, 'Raw Data', 'A1')
-            
+
+            mech_out_cell = horzcat(sample_list', mech_out_cell); % label the rows
+            headers_2 = {'I_ap (mm^4)','c_med (µm)', 'I_ml (mm^4)', 'c_ant (µm)'};
+            headers_2 = horzcat(' ', headers_2);
+            mech_mean_out = [headers_2; mech_out_cell]; % add column titles
+            xlswrite([overall_folder '\CTgeom_mech_toerror.xlsx'], mech_mean_out, 'Raw Data', 'A1')
         end
         
         if isempty(j)==1
@@ -854,10 +872,16 @@ xlswrite([overall_folder '\CTprof_avg.xlsx'], prof_mean_out, 'Raw Data', 'A1')
 % Create cell array for output containing all column and row headers along
 % with the geometric properties and save the data to an xlsx spreadsheet.
 geom_out_cell = horzcat(sample_list', geom_out_cell); % label the rows
-headers = {'Total CSA (mm^2)', 'Marrow Area (mm^2)', 'Cortical Area(mm^2)', 'Cortical Thickness (mm)', 'Periosteal BS (mm)', 'Endocortical BS (mm)',  'Imax (mm^4)', 'Theta max (deg)', 'Imin (mm^4)','Theta min (deg)', 'AP Width (mm)', 'ML Width (mm)', 'AP/ML',  'Iap (mm^4)', 'Iml (mm^4)',   'Section Modulus (mm^3)', 'Medial Extreme (mm)', 'Anterior Extreme (mm)','TMD (g/cm^3 HA)'};
+headers = {'Total Area (mm^2)', 'Marrow Area (mm^2)', 'Bone Area (mm^2)', 'BA/TA (%)', 'Cortical Thickness (mm)', 'Imax (mm^4)', 'Imin (mm^4)', 'TMD (g/cm^3 HA)'};
 headers = horzcat(' ', headers);
 geom_mean_out = [headers; geom_out_cell]; % add column titles
 xlswrite([overall_folder '\CTgeom_avg.xlsx'], geom_mean_out, 'Raw Data', 'A1')
+
+mech_out_cell = horzcat(sample_list', mech_out_cell); % label the rows
+headers_2 = {'I_ap (mm^4)','c_med (µm)', 'I_ml (mm^4)', 'c_ant (µm)'};
+headers_2 = horzcat(' ', headers_2);
+mech_mean_out = [headers_2; mech_out_cell]; % add column titles
+xlswrite([overall_folder '\CTgeom_mech.xlsx'], mech_mean_out, 'Raw Data', 'A1')
 
 tot_timer = toc(tot);
 tot_msg = ['\n\n Total time for all samples was ' num2str(tot_timer) ' seconds.'];

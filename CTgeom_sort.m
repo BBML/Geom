@@ -1,5 +1,8 @@
 function [ ]  = CTgeom_fc()
 %% Revision History
+% Edited Jan 6 2021 by Rachel Kohler to change CT_geom outputs: Total Area,
+% Marrow Area, Bone Area, BA/TA, Cortical Thickness, Imax, Imin, TMD. 
+% Also created new output file for mechanical analysis.
 
 % Edited April 2020 by Rachel Kohler to change the input method and the
 % output files by introducing a key file in place of a folder heiarchy.
@@ -229,7 +232,7 @@ for k=1:4
             fprintf('Processing %s.\n',filename)
             count=count+1;
 %             tic
-%     clearvars -except key group group_list name filename ppp offset res tot ang side bone threshold A prof_out_peri_cell prof_out_endo_cell sample_list geom_out_cell j i ac_step
+%     clearvars -except key group group_list name filename ppp offset res tot ang side bone threshold A prof_out_peri_cell prof_out_endo_cell sample_list geom_out_cell mech_out_cell j i ac_step
     
     % Get info for this specimen
         sample_list{ppp} = filename;
@@ -246,7 +249,8 @@ for k=1:4
         peri_out = zeros(length(slices),A);
         endo_out = zeros(length(slices),A);
         profiles = zeros((2*length(slices)+3),A);
-        geom_out = zeros(length(slices)+2,19);
+        geom_out = zeros(length(slices)+2,8);
+        mech_out = zeros(length(slices)+2,4);
         tmd_gs = zeros(length(slices), 3);
         centroid_x = zeros(length(slices), 1);
         centroid_y = zeros(length(slices), 1);
@@ -641,6 +645,7 @@ for k=1:4
                 total_cs_area = total_cs_area * 1e-6;
                 marrow_area = marrow_area * 1e-6;
                 cortical_area = cortical_area * 1e-6;
+                BA_TA=cortical_area/total_cs_area*100;
                 cort_thickness = cort_thickness * 1e-3;
                 AP_width = AP_width * 1e-3;
                 ML_width = ML_width * 1e-3;
@@ -676,10 +681,11 @@ for k=1:4
                 end
                 
                 % Store the output from each slice as a row in geom_out
-                geometry = [total_cs_area marrow_area cortical_area cort_thickness ...
-                    periosteal_BS endocortical_BS Imax ang_max Imin ang_min AP_width ML_width APtoMLratio  Iap ...
-                    Iml section_mod medial_extreme anterior_extreme tmd_HA];
+                geometry = [total_cs_area marrow_area cortical_area BA_TA cort_thickness Imax Imin tmd_HA];
+                mechanics = [Iap medial_extreme Iml anterior_extreme];
                 geom_out(j,:) = geometry;
+                mech_out(j,:) = mechanics;
+                
                 
             end
             %********************** SAMPLE OUTPUT**************************
@@ -739,7 +745,7 @@ for k=1:4
             title('Polar Plot of Avg Profile')
             line_r = -max(avg_peri)+50:max(avg_peri)+50;
             ang_max_rad = mean(geom_out(1:length(slices),8)).*pi./180;
-            ang_min_rad = mean(geom_out(1:length(slices),10)).*pi./180;
+            ang_min_rad = mean(geom_out(1:length(slices),8)).*pi./180;
             ang_max_rad = ones(1,length(line_r)).*ang_max_rad;
             ang_min_rad = ones(1,length(line_r)).*ang_min_rad;
             pol_max = polarplot(ang_max_rad, line_r, '-r');
@@ -781,8 +787,13 @@ for k=1:4
             % Create a cell array for geom_avg
             geom_mean = mean(geom_out(1:length(slices),:));
             mean_cell=num2cell(geom_mean);
-            geom_out_cell(ppp, 1:18) = mean_cell(1: 18);
-            geom_out_cell(ppp, 19) = num2cell(tmd_HA_avg);
+            geom_out_cell(ppp, 1:7) = mean_cell(1:7);
+            geom_out_cell(ppp, 8) = num2cell(tmd_HA_avg);
+            
+            mech_mean = mean(mech_out(1:length(slices),:));
+            mean_mech_cell=num2cell(mech_mean);
+            mech_out_cell(ppp, 1:4) = mean_mech_cell(1:4);
+            
             cd('..')
             ppp=ppp+1;
             
@@ -800,6 +811,8 @@ end
     %geom_out_cell(all(cellfun(@isempty,geom_out_cell),2),:) = [];
     partial = length(sample_list);
     geom_out_cell(partial+1:end,:) = [];
+    mech_out_cell(partial+1:end,:) = [];
+    
     prof_out_peri_cell(partial+1:end,:) = [];
     prof_out_endo_cell(partial+1:end,:) = [];
     
@@ -832,10 +845,17 @@ xlswrite('CTprof_AVG',prof_data',1,'a3:h723')
 % with the geometric properties and save the data to an xlsx spreadsheet.
 geom_out_data=cell2mat(geom_out_cell);
 geom_out_cell = horzcat(sample_list', group_list', geom_out_cell); % label the rows
-headers = {'Total CSA (mm^2)', 'Marrow Area (mm^2)', 'Cortical Area(mm^2)', 'Cortical Thickness (mm)', 'Periosteal BS (mm)', 'Endocortical BS (mm)',  'Imax (mm^4)', 'Theta max (deg)', 'Imin (mm^4)','Theta min (deg)', 'AP Width (mm)', 'ML Width (mm)', 'AP/ML',  'Iap (mm^4)', 'Iml (mm^4)',   'Section Modulus (mm^3)', 'Medial Extreme (mm)', 'Anterior Extreme (mm)','TMD (g/cm^3 HA)'};
-headers = horzcat(' ', 'Group', headers);
+ headers = {'Total Area (mm^2)', 'Marrow Area (mm^2)', 'Bone Area (mm^2)', 'BA/TA (%)', 'Cortical Thickness (mm)', 'Imax (mm^4)', 'Imin (mm^4)', 'TMD (g/cm^3 HA)'};
+ headers = horzcat(' ', 'Group', headers);
 geom_mean_out = [headers; geom_out_cell]; % add column titles
 xlswrite('CTgeom_avg.xlsx', geom_mean_out, 'Raw Data', 'A1')
+
+% geometry for mechanics saved to separate sheet
+mech_out_cell = horzcat(sample_list', group_list', mech_out_cell); % label the rows
+headers_2 = {'I_ap (mm^4)','c_med (µm)', 'I_ml (mm^4)', 'c_ant (µm)'};
+headers_2 = horzcat(' ', 'Group', headers_2);
+mech_mean_out = [headers_2; mech_out_cell]; % add column titles
+xlswrite('CTgeom_mech.xlsx', mech_mean_out, 'Raw Data', 'A1')
 
 %% Create folder with .csv file for each output property
 mkdir('Data Files');
@@ -851,7 +871,7 @@ ca2=specimen_count(1);
 cb1=ca2+1;
 cb2=cb1+specimen_count(2)-1;
 cc1=cb2+1;
-cc2=cc1+ specimen_count(3)-1;
+cc2=cc1+specimen_count(3)-1;
 cd1=cc2+1;
 cd2=cd1+specimen_count(4)-1;
 
@@ -864,11 +884,11 @@ data_c(min(size(data_c))+1:max_s,:) = 0;
 data_d=geom_out_data(cd1:cd2,:);
 data_d(min(size(data_d))+1:max_s,:) = 0;
 
-% Total CSA
+% Total Area
 data_print=num2cell([data_a(:,1), data_b(:,1); data_c(:,1) data_d(:,1)]');
 data_print=[org_rows, data_print];
 data_out=[org_col; data_print];
-writecell(data_out,'Total_CSA.csv')
+writecell(data_out,'Total_Area.csv')
 
 % Marrow Area
 data_print=num2cell([data_a(:,2), data_b(:,2); data_c(:,2) data_d(:,2)]');
@@ -876,50 +896,38 @@ data_print=[org_rows, data_print];
 data_out=[org_col; data_print];
 writecell(data_out,'Marrow_Area.csv')
 
-% Cortical Area
+% Bone Area
 data_print=num2cell([data_a(:,3), data_b(:,3); data_c(:,3) data_d(:,3)]');
 data_print=[org_rows, data_print];
 data_out=[org_col; data_print];
-writecell(data_out,'Cortical_Area.csv')
+writecell(data_out,'Bone_Area.csv')
+
+% BA/TA
+data_print=num2cell([data_a(:,4), data_b(:,4); data_c(:,4) data_d(:,4)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'BA_TA.csv')
 
 % Cortical Thickness
-data_print=num2cell([data_a(:,4), data_b(:,4); data_c(:,4) data_d(:,4)]');
+data_print=num2cell([data_a(:,5), data_b(:,5); data_c(:,5) data_d(:,5)]');
 data_print=[org_rows, data_print];
 data_out=[org_col; data_print];
 writecell(data_out,'Cortical_Thickness.csv')
 
-% Periosteal BS
-data_print=num2cell([data_a(:,5), data_b(:,5); data_c(:,5) data_d(:,5)]');
-data_print=[org_rows, data_print];
-data_out=[org_col; data_print];
-writecell(data_out,'Periosteal_BS.csv')
-
-% Endocortical BS
-data_print=num2cell([data_a(:,6), data_b(:,6); data_c(:,6) data_d(:,6)]');
-data_print=[org_rows, data_print];
-data_out=[org_col; data_print];
-writecell(data_out,'Endocortical_BS.csv')
-
 % Imax
-data_print=num2cell([data_a(:,7), data_b(:,7); data_c(:,7) data_d(:,7)]');
+data_print=num2cell([data_a(:,6), data_b(:,6); data_c(:,6) data_d(:,6)]');
 data_print=[org_rows, data_print];
 data_out=[org_col; data_print];
 writecell(data_out,'Imax.csv')
 
 % Imin
-data_print=num2cell([data_a(:,9), data_b(:,9); data_c(:,9) data_d(:,9)]');
+data_print=num2cell([data_a(:,7), data_b(:,7); data_c(:,7) data_d(:,7)]');
 data_print=[org_rows, data_print];
 data_out=[org_col; data_print];
 writecell(data_out,'Imin.csv')
 
-% Section Modulus 
-data_print=num2cell([data_a(:,16), data_b(:,16); data_c(:,16) data_d(:,16)]');
-data_print=[org_rows, data_print];
-data_out=[org_col; data_print];
-writecell(data_out,'Section_Modulus.csv')
-
 % TMD
-data_print=num2cell([data_a(:,19), data_b(:,19); data_c(:,19) data_d(:,19)]');
+data_print=num2cell([data_a(:,8), data_b(:,8); data_c(:,8) data_d(:,8)]');
 data_print=[org_rows, data_print];
 data_out=[org_col; data_print];
 writecell(data_out,'TMD.csv')

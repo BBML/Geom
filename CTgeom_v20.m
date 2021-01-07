@@ -2,7 +2,8 @@ function [ ]  = CTgeom_fc()
 %% Revision History
 
 % Edited Jan 6 2021 by Rachel Kohler to change CT_geom outputs: Total Area,
-% Marrow Area, Bone Area, BA/TA, Cortical Thickness, Imax, Imin, TMD
+% Marrow Area, Bone Area, BA/TA, Cortical Thickness, Imax, Imin, TMD. 
+% Also created new output file for mechanical analysis.
 
 % Edited Feb 4 2020 by Rachel Kohler to add error explanation if folders
 % are setup wrong.

@@ -1,11 +1,10 @@
 function [ ]  = CTgeom_fc()
 %% Revision History
 
-% Edited Jan 6 2021 by Rachel Kohler to change CT_geom outputs: Total Area,
-% Marrow Area, Bone Area, BA/TA, Cortical Thickness, Imax, Imin, TMD
-
-% Edited Feb 4 2020 by Rachel Kohler to add error explanation if folders
-% are setup wrong.
+% Edited April 2020 by Rachel Kohler to change the input method and the
+% output files by introducing a key file in place of a folder heiarchy.
+% This enables the code to pre-sort the data into the testing groups, and
+% output organized data.
 
 % Edited Oct 3 2019 by Rachel Kohler to output c_ant (anterior extreme).
 % Further edits done Oct 10 2019 to clean up code (deleting unused code).
@@ -42,19 +41,20 @@ function [ ]  = CTgeom_fc()
 % when the error occured along with the actual error message.
 
 %% Proper Setup
-
 % These files should be vertically aligned and oriented with anterior to the
 % right.  Therefore, right limbs will be oriented medial up and left limbs
 % will be oriented medial down.
 
-% Each day of scanning should have its own folder in the parent directory.
-% Each bone's ROI should be saved as a separate folder named with sample's
-% ID# in the fodler corresponding to the day it was scanned. For example, if
-% sample 50 was scanned on 7/3/15 and sample 11 was scanned on 11/14/14, in
-% a folder named 'Standard Site' you would have a folder named '7-3-15' and a
-% folder named '11-14-14'. Within '7-3-15' there would be a folder named
-% '50' containing the slice .bmp files of the standard site and within
-% '11-14-14' there would be a folder named '11' containing its .bmps.
+% FOLDER HEIRARCHY SETUP IS NO LONGER NEEDED
+% All folders of .bmp files go in the same folder as this MATLAB code. To
+% create the required key file, make an Excel file with the following info:
+% 
+% KEY FILE
+% Column 1- specimen IDs (must match the folder names)
+% Column 2- test variable type 1 (E.g., Sex: Male or Female)
+% Column 3- test variable type 2 (E.g., Genotype: WT or Amish)
+% Column 4- AC-# value (Phantom info from that specimen's scan day)
+% Column 5- Denominator (Phantom info from that specimen's scan day)
 
 % There is no longer a naming convention that you must follow. Each bone
 % can have a different number of slices, but all bones must have the sample
@@ -67,32 +67,94 @@ clear all % clear all variables
 format long % change format to long
 warning('off','MATLAB:xlswrite:AddSheet'); % disable add sheet warning for Excel
 
-%% Input parameters and check for common erros
+%% Import a key file with the test variable info for each specimen ID, sorted by columns
+[key_filename, key_pathname] = uigetfile({'*.xls;*.xlsx;*.csv','Excel Files (*.xls,*.xlsx,*.csv)'; '*.*',  'All Files (*.*)'},'Pick the file with key info');
+[~,~,key] = xlsread([key_pathname key_filename],1);
 
-% Select the folder containing all the standard site ROIs separated into
-% folders
-overall_folder=uigetdir;
-cd(overall_folder)
-overall_listing=dir(overall_folder);
+% Define names for the test categories and their corresponding variables
+% Overall categories
+cat_1=key{1,2};
+cat_2=key{1,3};
 
-% Create an array of all the sample folders in the dataset
-folders = overall_listing(arrayfun(@(x) x.name(1), overall_listing) ~= '.');
-folders = folders(arrayfun(@(x) x.isdir(1), folders) ~= 0);
-
-% Create a loop to count how many total samples there are in all sub
-% folders
-total_count = 0;
-
-for m=1:length(folders)
-    sub_folder=[overall_folder '\' folders(m,1).name];
-    subfolder_listing=dir(sub_folder);
-    sub_folders = subfolder_listing(arrayfun(@(x) x.name(1), subfolder_listing) ~= '.');
-    sub_folders = sub_folders(arrayfun(@(x) x.isdir(1), sub_folders) ~= 0);
-    total_count = total_count + length(sub_folders); 
+% Variables in category 1
+check1_1=key{2,2};
+for j=2:length(key)
+    if strcmp(check1_1,key{j,2})
+    else
+        check1_2=key{j,2};
+        break
+    end
 end
 
-diary([overall_folder '\Diary.txt'])
-diary on
+% 
+answer = questdlg('Which variable would you like placed first?', ...
+	cat_1, ...
+	check1_1,check1_2,'');
+% Handle response
+switch answer
+    case check1_1
+        cat1_1=check1_1;
+        cat1_2=check1_2;
+    case check1_2
+        cat1_1=check1_2;
+        cat1_2=check1_1;
+end
+
+%Variables in category 2
+check2_1=key{2,3};
+for j=2:length(key)
+    if strcmp(check2_1,key{j,3})
+    else
+        check2_2=key{j,3};
+        break
+    end
+end
+answer = questdlg('Which variable would you like placed first?', ...
+	cat_2, ...
+	check2_1,check2_2,'');
+% Handle response
+switch answer
+    case check2_1
+        cat2_1=check2_1;
+        cat2_2=check2_2;
+    case check2_2
+        cat2_1=check2_2;
+        cat2_2=check2_1;
+end
+
+A_name=[cat1_1 ' ' cat2_1];
+B_name=[cat1_1 ' ' cat2_2];
+C_name=[cat1_2 ' ' cat2_1];
+D_name=[cat1_2 ' ' cat2_2];
+
+% Create the four vector sets
+% Set counters for each set
+ca=0;
+cb=0;
+cc=0;
+cD=0;
+
+% Create sets of ID names sorted into four groups based on defined variables
+for j=2:length(key)
+    if strcmp(key{j,2},cat1_1) && strcmp(key{j,3},cat2_1)
+        ca=ca+1;
+        A{ca}=key{j,1};
+    elseif strcmp(key{j,2},cat1_1) && strcmp(key{j,3},cat2_2)
+        cb=cb+1;
+        B{cb}=key{j,1};
+    elseif strcmp(key{j,2},cat1_2) && strcmp(key{j,3},cat2_1)
+        cc=cc+1;
+        C{cc}=key{j,1};
+    else
+        cD=cD+1;
+        D{cD}=key{j,1};
+    end
+end
+
+sorted={A_name A;B_name B;C_name C;D_name D};
+
+%% Input parameters and check for common erros
+
 res = input ('\n\n Voxel resolution in um: '); % input the isotropic voxel size from CTAn
 
 % Input step used for extreme calculations (typically 0.5) and display a
@@ -142,103 +204,52 @@ while bone_log~=1
     bone = bone(1:1);
     bone_log = ~strcmp(bone,'f') + ~strcmp(bone,'t');
 end
-
-if length(folders)==0
-    fprintf(2,'\n----------------------ERROR-----------------------\n');
-    fprintf(2,'Your files are not properly organized.\nSee line 43 in the code and set up your folders according to the prescribed hierarchy.\n');
-    return
-end
-
-eq_num = zeros(length(folders),1);
-eq_denom = zeros(length(folders),1);
-
-for m=1:length(folders)
-    sub_folder=[overall_folder '\' folders(m,1).name];
-    day = sub_folder(length(overall_folder)+2:end);
-    fprintf(['\n Enter attenuation coefficients (0-0.11) in CTAn''s BMD equation  for ' day '. \n'])
-    
-    
-    % Input HA calibration equation from CTAn and display a warning if
-    % needed. CTAn uses an equation to calculate BMD for every pixel
-    % according to BMD = (AC - AC_min)/AC_range
-    eq_n = input(' Enter the minimum attenuation coefficient (numerator): ');
-    while eq_n>.11 || eq_n<0
-        fprintf(2,'\n Please enter a proper minimum attenuation coefficient (0-0.11). \n\n')
-        eq_n = input(' Enter the minimum attenuation coefficient (numerator): ');
-    end
-    
-    eq_num(m, 1) = eq_n;
-    
-    eq_d = input(' Enter the attenuation coefficient range (denominator): ');
-    while eq_d>.11 || eq_d<0 || eq_d<eq_n
-        fprintf(2,'\n Please enter a proper attenuation coefficient range (0-0.11, > minimum). \n\n')
-        eq_d = input(' Enter the attenuation coefficient range (denominator): ');
-    end
-    
-    eq_denom(m, 1) = eq_d;
-    
-end
-
-diary off
-
-tot = tic; % start the stop watch
+% tot = tic; % start the stop watch
 
 %% Calculation
+% Preallocate variables
+A = 360/ang+1;
+ac_step = .11/255;
+offset = 0;
+ppp=1;
 
-try % use a try/catch block to run the code and save anything that has already ran
+% Cycle through each group
+for k=1:4
+    group=sorted{k,2};
+    name=sorted{k,1};
+    count=0;
+    prof_peri_avg=zeros(1,721);
+    prof_endo_avg=zeros(1,721);
+    % Cycle through specimens in each group
+    for m=1:length(group)
+        filename=group{m};
+        if exist(filename, 'dir')~=7
+            fprintf('Folder not found for %s.\n',filename)
+        else
+            fprintf('Processing %s.\n',filename)
+            count=count+1;
+%             tic
+%     clearvars -except key group group_list name filename ppp offset res tot ang side bone threshold A prof_out_peri_cell prof_out_endo_cell sample_list geom_out_cell j i ac_step
     
-    % Preallocate variabless
-    A = 360/ang+1;
-    prof_out_peri_cell = cell(total_count, A);
-    prof_out_endo_cell = cell(total_count, A);
-    geom_out_cell = cell(total_count, 8);
-    mech_out_cell = cell(total_count, 4);
-    sample_list = cell(1, total_count);
-    ac_step = .11/255;
-    offset = 0;
-    
-    % Create a loop to index all the sub_folders
-    for m=1:length(folders)
-        sub_folder=[overall_folder '\' folders(m,1).name];
-        cd(sub_folder);
+    % Get info for this specimen
+        sample_list{ppp} = filename;
+        group_list{ppp}=name;
+        data_place=find(strcmp(key,filename));
+        eq_num=key{data_place,4};
+        eq_denom=key{data_place,5};
         
-        subfolder_listing=dir(sub_folder);
+    % Store the .bmp filenames in the folder
+        cd(filename);
+        slices=dir('*.bmp');
         
-        % Create an array of all the sample folders in the dataset
-        sub_folders = subfolder_listing(arrayfun(@(x) x.name(1), subfolder_listing) ~= '.');
-        sub_folders = sub_folders(arrayfun(@(x) x.isdir(1), sub_folders) ~= 0);
-        
-        % Create loop to analyze every sample's folder within the overall
-        % folder
-        if length(sub_folders)==0
-            fprintf(2,'\n----------------------ERROR-----------------------\n');
-            fprintf(2,'Your files are not properly organized.\nSee line 43 in the code and set up your folders according to the prescribed hierarchy.\n');
-            return
-        end
-            
-        for k=1:length(sub_folders)
-            
-            tic
-            
-            clearvars -except offset res tot total_count ang side bone eq_num eq_denom overall_folder sub_folder overall_listing subfolder_listing threshold  sub_folders folders A prof_out_peri_cell prof_out_endo_cell sample_list geom_out_cell mech_out_cell m k ac_step
-            
-            % Store the .bmp filenames in the folder
-            filename=[sub_folder '\' sub_folders(k,1).name];
-            cd(filename);
-            slices=dir([filename '\*.bmp']);
-            
-            % Store the folder name to be used as the ID during output
-            folder = (sub_folders(k,1).name);
-            
-            % Pre-allocating arrays for data output later
-            peri_out = zeros(length(slices),A);
-            endo_out = zeros(length(slices),A);
-            profiles = zeros((2*length(slices)+3),A);
-            geom_out = zeros(length(slices)+2,8);
-            mech_out = zeros(length(slices)+2,4);
-            tmd_gs = zeros(length(slices), 3);
-            centroid_x = zeros(length(slices), 1);
-            centroid_y = zeros(length(slices), 1);
+        % Pre-allocating arrays for data output later
+        peri_out = zeros(length(slices),A);
+        endo_out = zeros(length(slices),A);
+        profiles = zeros((2*length(slices)+3),A);
+        geom_out = zeros(length(slices)+2,19);
+        tmd_gs = zeros(length(slices), 3);
+        centroid_x = zeros(length(slices), 1);
+        centroid_y = zeros(length(slices), 1);
             
             % Create loop to calculate parameters for each slice
             for j=1:length(slices)
@@ -269,7 +280,7 @@ try % use a try/catch block to run the code and save anything that has already r
                 stats = regionprops(slice,section,'MeanIntensity','PixelValues');
                 tmd_gs(j,:) = [stats.MeanIntensity sum([stats.PixelValues]) length([stats.PixelValues])];
                 tmd_ac = tmd_gs(1).*ac_step;
-                tmd_HA = (tmd_ac - eq_num(m,1))/eq_denom(m,1);
+                tmd_HA = (tmd_ac - eq_num)/eq_denom;
                 
                 % Manually calculate the centroid from pixel locations:
                 [index_y,index_x] = find (slice == 1); % this finds the x and y locations of each "on" pixel
@@ -376,7 +387,7 @@ try % use a try/catch block to run the code and save anything that has already r
                 end
                 
                 % To plot this in polar,you need to append the inner and
-                % outer vectors with the vaule at 360 degrees (0 deg) to
+                % outer vectors with the value at 360 degrees (0 deg) to
                 % close
                 index = index + 1;
                 inner_fiber(1, index) = inner_fiber(1);
@@ -630,7 +641,6 @@ try % use a try/catch block to run the code and save anything that has already r
                 total_cs_area = total_cs_area * 1e-6;
                 marrow_area = marrow_area * 1e-6;
                 cortical_area = cortical_area * 1e-6;
-                BA_TA=cortical_area/total_cs_area*100;
                 cort_thickness = cort_thickness * 1e-3;
                 AP_width = AP_width * 1e-3;
                 ML_width = ML_width * 1e-3;
@@ -666,13 +676,12 @@ try % use a try/catch block to run the code and save anything that has already r
                 end
                 
                 % Store the output from each slice as a row in geom_out
-                geometry = [total_cs_area marrow_area cortical_area BA_TA cort_thickness Imax Imin tmd_HA];
-                mechanics = [Iap medial_extreme Iml anterior_extreme];
+                geometry = [total_cs_area marrow_area cortical_area cort_thickness ...
+                    periosteal_BS endocortical_BS Imax ang_max Imin ang_min AP_width ML_width APtoMLratio  Iap ...
+                    Iml section_mod medial_extreme anterior_extreme tmd_HA];
                 geom_out(j,:) = geometry;
-                mech_out(j,:) = mechanics;
                 
             end
-            
             %********************** SAMPLE OUTPUT**************************
             
             % The matrice for angle, outer fiber, and inner fiber are
@@ -730,7 +739,7 @@ try % use a try/catch block to run the code and save anything that has already r
             title('Polar Plot of Avg Profile')
             line_r = -max(avg_peri)+50:max(avg_peri)+50;
             ang_max_rad = mean(geom_out(1:length(slices),8)).*pi./180;
-            ang_min_rad = mean(geom_out(1:length(slices),8)).*pi./180;
+            ang_min_rad = mean(geom_out(1:length(slices),10)).*pi./180;
             ang_max_rad = ones(1,length(line_r)).*ang_max_rad;
             ang_min_rad = ones(1,length(line_r)).*ang_min_rad;
             pol_max = polarplot(ang_max_rad, line_r, '-r');
@@ -738,7 +747,7 @@ try % use a try/catch block to run the code and save anything that has already r
             legend([pol_max,pol_min],'\theta max','\theta min','Location','southoutside','Orientation','horizontal')
             hold off
             
-            print ('-dpng', folder) % save the figure in the sample folder
+            print ('-dpng', filename)
             
             % The matrice for angle, outer fiber and inner fiber are
             % shifted to begin at 0 degrees
@@ -753,10 +762,12 @@ try % use a try/catch block to run the code and save anything that has already r
             % Create a cell array for prof_avg
             prof_mean_peri = prof_shift(2*length(slices)+2,:);
             prof_cell_peri = num2cell(prof_mean_peri);
-            prof_out_peri_cell(offset+k, :) = prof_cell_peri;
+            prof_peri_avg(m,:)=prof_mean_peri;
+            prof_out_peri_cell(ppp, :) = prof_cell_peri;
             prof_mean_endo = prof_shift(2*length(slices)+3,:);
             prof_cell_endo = num2cell(prof_mean_endo);
-            prof_out_endo_cell(offset+k, :) = prof_cell_endo;
+            prof_out_endo_cell(ppp, :) = prof_cell_endo;
+            prof_endo_avg(m,:)=prof_mean_endo;
             
             % Calculate average TMD using total counts from each slice
             % instead of a simple average as before because the pixel count
@@ -765,97 +776,37 @@ try % use a try/catch block to run the code and save anything that has already r
             tot_px = sum(tmd_gs(:,3), 1); % total pixels for all slices
             tmd_gs_avg = tot_gs/tot_px; % average greyscale intensity for all slices
             tmd_ac_avg = tmd_gs_avg.*ac_step; % convert to attenuation coefficient (AC)
-            tmd_HA_avg = (tmd_ac_avg - eq_num(m,1))/eq_denom(m,1); % convert AC to BMD using equation
+            tmd_HA_avg = (tmd_ac_avg - eq_num)/eq_denom; % convert AC to BMD using equation
             
             % Create a cell array for geom_avg
             geom_mean = mean(geom_out(1:length(slices),:));
             mean_cell=num2cell(geom_mean);
-            geom_out_cell(offset+k, 1:7) = mean_cell(1:7);
-            geom_out_cell(offset+k, 8) = num2cell(tmd_HA_avg);
+            geom_out_cell(ppp, 1:18) = mean_cell(1: 18);
+            geom_out_cell(ppp, 19) = num2cell(tmd_HA_avg);
+            cd('..')
+            ppp=ppp+1;
             
-            mech_mean = mean(mech_out(1:length(slices),:));
-            mean_mech_cell=num2cell(mech_mean);
-            mech_out_cell(offset+k, 1:4) = mean_mech_cell(1:4);
-
-            sample_list{offset+k} = folder;
-            
-            timer = toc;
-            out_msg = ['\n Sample ' num2str(folder) ' took ' num2str(timer) ' seconds.'];
-            diary([overall_folder '\Diary.txt'])
-            diary on
-            fprintf(out_msg)
-            diary off
+%             timer = toc;
+%             fprintf('\n Sample %s took %u seconds.',filename,timer)
         end
-        
-        offset = offset + length(sub_folders);
-        
     end
+    specimen_count(k)=count;
+    data_1=mean(prof_peri_avg);
+    data_2=mean(prof_endo_avg);
+    avg_prof{k,:}={name, data_1, data_2};
+end       
+    % Trim the variables to avoid dimension errors
+    sample_list(:,all(cellfun(@isempty,sample_list),1)) = [];
+    %geom_out_cell(all(cellfun(@isempty,geom_out_cell),2),:) = [];
+    partial = length(sample_list);
+    geom_out_cell(partial+1:end,:) = [];
+    prof_out_peri_cell(partial+1:end,:) = [];
+    prof_out_endo_cell(partial+1:end,:) = [];
     
-catch ME
-    
-    if exist('k', 'var') && exist('folder', 'var') && exist('j', 'var')
-        
-        if k+offset>1 % only attempt to save data if this is not the first sample analyzed
-            
-            % Trim the variables to avoid dimension errors
-            sample_list(:,all(cellfun(@isempty,sample_list),1)) = [];
-            %geom_out_cell(all(cellfun(@isempty,geom_out_cell),2),:) = [];
-            partial = length(sample_list);
-            geom_out_cell(partial+1:end,:) = [];
-            mech_out_cell(partial+1:end,:) = [];
-            
-            prof_out_peri_cell(partial+1:end,:) = [];
-            prof_out_endo_cell(partial+1:end,:) = [];
-            
-            
-            % Save the analysis that has already run
-            peri_cell = ['Periosteal'; sample_list'];
-            endo_cell = ['Endocortical'; sample_list'];
-            col_prof_cell = [peri_cell; ' '; endo_cell];
-            blank = cell(1, 360/ang +1);
-            prof_out = [num2cell(0:ang:360); prof_out_peri_cell; blank; num2cell(0:ang:360); prof_out_endo_cell];
-            prof_mean_out = horzcat(col_prof_cell, prof_out);
-            xlswrite([overall_folder '\CTprof_avg_toerror.xlsx'], prof_mean_out, 'Raw Data', 'A1')
-            
-            geom_out_cell = horzcat(sample_list', geom_out_cell); % label the rows
-            headers = {'Total Area (mm^2)', 'Marrow Area (mm^2)', 'Bone Area (mm^2)', 'BA/TA (%)', 'Cortical Thickness (mm)', 'Imax (mm^4)', 'Imin (mm^4)', 'TMD (g/cm^3 HA)'};
-            headers = horzcat(' ', headers);
-            geom_mean_out = [headers; geom_out_cell]; % add column titles
-            xlswrite([overall_folder '\CTgeom_avg_toerror.xlsx'], geom_mean_out, 'Raw Data', 'A1')
-
-            mech_out_cell = horzcat(sample_list', mech_out_cell) % label the rows
-            headers_2 = {'I_ap (mm^4)','c_med (µm)', 'I_ml (mm^4)', 'c_ant (µm)'};
-            headers_2 = horzcat(' ', headers_2);
-            mech_mean_out = [headers_2; mech_out_cell]; % add column titles
-            xlswrite([overall_folder '\CTgeom_mech_toerror.xlsx'], mech_mean_out, 'Raw Data', 'A1')
-        end
-        
-        if isempty(j)==1
-            
-            diary([overall_folder '\Diary.txt'])
-            diary on
-            % Display the folder name where the error occured
-            msg = ['\n Error occured at the beginning of loop ' num2str(k) '. No data could be read from folder ' num2str(folder) '.\n\n'];
-            fprintf(2,msg) 
-            
-        else
-            % Display the folder name where the error occured
-            msg = ['\n Error occured during loop ' num2str(k) ' at folder ' num2str(folder) '  in slice ' num2str(j) '. \n\n'];
-            fprintf(2,msg)
-            
-        end
-        
-    end
-    
-    tot_timer = toc(tot);
-    tot_msg = ['  mn Total time for all samples to error was ' num2str(tot_timer) ' seconds.'];
-    avg_msg = [' Average time per sample was ' num2str(tot_timer/total_count) ' seconds. \n\n'];
-    fprintf(tot_msg)
-    fprintf(avg_msg)
-    
-    rethrow(ME) % rethrow error for troubleshooting
-    
-end
+    prof_data=[avg_prof{1,1}{1,2}; avg_prof{1,1}{1,3}; ...
+    avg_prof{2,1}{1,2}; avg_prof{2,1}{1,3}; ...
+    avg_prof{3,1}{1,2}; avg_prof{3,1}{1,3}; ...
+    avg_prof{4,1}{1,2}; avg_prof{4,1}{1,3}];
 
 %% Mean property and profile output for each bone
 
@@ -867,32 +818,116 @@ col_prof_cell = [peri_cell; ' '; endo_cell];
 blank = cell(1, 360/ang +1);
 prof_out = [prof_cell(1, :); prof_out_peri_cell; blank; prof_cell(1, :); prof_out_endo_cell];
 prof_mean_out = horzcat(col_prof_cell, prof_out);
-xlswrite([overall_folder '\CTprof_avg.xlsx'], prof_mean_out, 'Raw Data', 'A1')
+xlswrite('CTprof_avg_ALL.xlsx', prof_mean_out, 'Raw Data', 'A1')
+
+% Create summary summary prof file
+row_1={A_name, ' ', B_name, ' ', C_name, ' ', D_name,};
+row_2={'Periosteal','Endocortical','Periosteal','Endocortical','Periosteal','Endocortical','Periosteal','Endocortical'};
+
+xlswrite('CTprof_AVG',row_1,1,'a1')
+xlswrite('CTprof_AVG',row_2,1,'a2')
+xlswrite('CTprof_AVG',prof_data',1,'a3:h723')
 
 % Create cell array for output containing all column and row headers along
 % with the geometric properties and save the data to an xlsx spreadsheet.
-geom_out_cell = horzcat(sample_list', geom_out_cell); % label the rows
-headers = {'Total Area (mm^2)', 'Marrow Area (mm^2)', 'Bone Area (mm^2)', 'BA/TA (%)', 'Cortical Thickness (mm)', 'Imax (mm^4)', 'Imin (mm^4)', 'TMD (g/cm^3 HA)'};
-headers = horzcat(' ', headers);
+geom_out_data=cell2mat(geom_out_cell);
+geom_out_cell = horzcat(sample_list', group_list', geom_out_cell); % label the rows
+headers = {'Total CSA (mm^2)', 'Marrow Area (mm^2)', 'Cortical Area(mm^2)', 'Cortical Thickness (mm)', 'Periosteal BS (mm)', 'Endocortical BS (mm)',  'Imax (mm^4)', 'Theta max (deg)', 'Imin (mm^4)','Theta min (deg)', 'AP Width (mm)', 'ML Width (mm)', 'AP/ML',  'Iap (mm^4)', 'Iml (mm^4)',   'Section Modulus (mm^3)', 'Medial Extreme (mm)', 'Anterior Extreme (mm)','TMD (g/cm^3 HA)'};
+headers = horzcat(' ', 'Group', headers);
 geom_mean_out = [headers; geom_out_cell]; % add column titles
-xlswrite([overall_folder '\CTgeom_avg.xlsx'], geom_mean_out, 'Raw Data', 'A1')
+xlswrite('CTgeom_avg.xlsx', geom_mean_out, 'Raw Data', 'A1')
 
-mech_out_cell = horzcat(sample_list', mech_out_cell); % label the rows
-headers_2 = {'I_ap (mm^4)','c_med (µm)', 'I_ml (mm^4)', 'c_ant (µm)'};
-headers_2 = horzcat(' ', headers_2);
-mech_mean_out = [headers_2; mech_out_cell]; % add column titles
-xlswrite([overall_folder '\CTgeom_mech.xlsx'], mech_mean_out, 'Raw Data', 'A1')
+%% Create folder with .csv file for each output property
+mkdir('Data Files');
+cd('Data Files');
+max_s=max(specimen_count);
 
-tot_timer = toc(tot);
-tot_msg = ['\n\n Total time for all samples was ' num2str(tot_timer) ' seconds.'];
-avg_msg = [' Average time per sample was ' num2str(tot_timer/total_count) ' seconds. \n\n'];
-diary([overall_folder '\Diary.txt'])
-diary on
-fprintf(tot_msg)
-fprintf(avg_msg)
-diary off
+org_rows={cat1_1; cat1_2};
+org_col=horzcat(' ', cat2_1, num2cell(zeros(1,max_s-1)), cat2_2, num2cell(zeros(1,max_s-1)));
 
-cd(overall_folder);
+% Get indexes for each group set
+ca1=1;
+ca2=specimen_count(1);
+cb1=ca2+1;
+cb2=cb1+specimen_count(2)-1;
+cc1=cb2+1;
+cc2=cc1+ specimen_count(3)-1;
+cd1=cc2+1;
+cd2=cd1+specimen_count(4)-1;
+
+data_a=geom_out_data(ca1:ca2,:);
+data_a(min(size(data_a))+1:max_s,:) = 0;
+data_b=geom_out_data(cb1:cb2,:);
+data_b(min(size(data_b))+1:max_s,:) = 0;
+data_c=geom_out_data(cc1:cc2,:);
+data_c(min(size(data_c))+1:max_s,:) = 0;
+data_d=geom_out_data(cd1:cd2,:);
+data_d(min(size(data_d))+1:max_s,:) = 0;
+
+% Total CSA
+data_print=num2cell([data_a(:,1), data_b(:,1); data_c(:,1) data_d(:,1)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Total_CSA.csv')
+
+% Marrow Area
+data_print=num2cell([data_a(:,2), data_b(:,2); data_c(:,2) data_d(:,2)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Marrow_Area.csv')
+
+% Cortical Area
+data_print=num2cell([data_a(:,3), data_b(:,3); data_c(:,3) data_d(:,3)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Cortical_Area.csv')
+
+% Cortical Thickness
+data_print=num2cell([data_a(:,4), data_b(:,4); data_c(:,4) data_d(:,4)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Cortical_Thickness.csv')
+
+% Periosteal BS
+data_print=num2cell([data_a(:,5), data_b(:,5); data_c(:,5) data_d(:,5)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Periosteal_BS.csv')
+
+% Endocortical BS
+data_print=num2cell([data_a(:,6), data_b(:,6); data_c(:,6) data_d(:,6)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Endocortical_BS.csv')
+
+% Imax
+data_print=num2cell([data_a(:,7), data_b(:,7); data_c(:,7) data_d(:,7)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Imax.csv')
+
+% Imin
+data_print=num2cell([data_a(:,9), data_b(:,9); data_c(:,9) data_d(:,9)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Imin.csv')
+
+% Section Modulus 
+data_print=num2cell([data_a(:,16), data_b(:,16); data_c(:,16) data_d(:,16)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'Section_Modulus.csv')
+
+% TMD
+data_print=num2cell([data_a(:,19), data_b(:,19); data_c(:,19) data_d(:,19)]');
+data_print=[org_rows, data_print];
+data_out=[org_col; data_print];
+writecell(data_out,'TMD.csv')
+
+% tot_timer = toc(tot);
+% tot_msg = ['\n\n Total time for all samples was ' num2str(tot_timer) ' seconds.'];
+% avg_msg = [' Average time per sample was ' num2str(tot_timer/length(key)) ' seconds. \n\n'];
+% fprintf(tot_msg)
+% fprintf(avg_msg)
 
 end
-
